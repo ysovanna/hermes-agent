@@ -547,7 +547,7 @@ def _readonly_skill_mount_args() -> list[str]:
                 if problem:
                     logger.warning("Docker: skipping %s mount — %s: %s", noun.split()[0], problem, src)
                     continue
-                args.extend(["-v", f"{entry['host_path']}:{entry['container_path']}:ro"])
+                args.extend(["-v", f"{_windows_to_posix_path(entry['host_path'])}:{entry['container_path']}:ro"])
                 logger.info("Docker: mounting %s %s -> %s", noun, entry["host_path"], entry["container_path"])
     except Exception as e:
         logger.debug("Docker: could not load credential file mounts: %s", e)
@@ -610,6 +610,25 @@ def _free_host_cwd_mount(volume_args: list[str]) -> str:
         if not _container_mount_taken(volume_args, candidate):
             return candidate
     return _HOST_CWD_FALLBACK_MOUNTS[-1]
+
+
+def _windows_to_posix_path(path: str) -> str:
+    """Convert Windows drive path to POSIX ``/c/...`` for Docker -v/-w flags.
+
+    Docker's volume mount parser on Linux does not understand backslashes;
+    Git Bash also mangles them as escape sequences (\\U, \\a, etc.).  This
+    helper normalises every host-side path before it enters a -v or -w flag
+    so the container always sees clean POSIX paths.
+
+    Idempotent: already-POSIX paths pass through unchanged.
+    """
+    if not isinstance(path, str):
+        return path
+    p = path.replace("\\", "/")
+    m = re.match(r"^([A-Za-z]):/", p)
+    if m:
+        return f"/{m.group(1).lower()}{p[m.start()+2:]}"
+    return p
 
 
 def _abs_host_cwd(host_cwd: str) -> str:
@@ -841,7 +860,7 @@ class DockerEnvironment(BaseEnvironment):
             if ":" not in vol:
                 logger.warning("Docker volume '%s' missing colon, skipping", vol)
                 continue
-            volume_args.extend(["-v", vol])
+            volume_args.extend(["-v", f"{_windows_to_posix_path(vol)}"])
         workspace_explicitly_mounted = any(":/workspace" in v for v in volume_args)
 
         host_cwd_abs = _abs_host_cwd(host_cwd) if host_cwd else ""
@@ -880,18 +899,18 @@ class DockerEnvironment(BaseEnvironment):
             sandbox = get_sandbox_dir() / "docker" / _sandbox_dir_name(task_id)
             self._home_dir = str(sandbox / "home")
             os.makedirs(self._home_dir, exist_ok=True)
-            writable_args += ["-v", f"{self._home_dir}:/root"]
+            writable_args += ["-v", f"{_windows_to_posix_path(self._home_dir)}:/root"]
             if mount_workspace:
                 self._workspace_dir = str(sandbox / "workspace")
                 os.makedirs(self._workspace_dir, exist_ok=True)
-                writable_args += ["-v", f"{self._workspace_dir}:/workspace"]
+                writable_args += ["-v", f"{_windows_to_posix_path(self._workspace_dir)}:/workspace"]
         else:
             writable_args += ["--tmpfs", "/workspace:rw,exec,size=10g"] if mount_workspace else []
             writable_args += ["--tmpfs", "/home:rw,exec,size=1g", "--tmpfs", "/root:rw,exec,size=1g"]
 
         if bind_target:
             logger.info("Mounting configured host cwd to %s: %s", bind_target, host_cwd_abs)
-            volume_args = ["-v", f"{host_cwd_abs}:{bind_target}", *volume_args]
+            volume_args = ["-v", f"{_windows_to_posix_path(host_cwd_abs)}:{bind_target}", *volume_args]
         elif workspace_explicitly_mounted and not existing_mount:
             logger.debug("Skipping docker cwd mount: /workspace already mounted by user config")
         return volume_args, writable_args
