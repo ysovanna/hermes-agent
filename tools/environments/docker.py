@@ -1021,7 +1021,7 @@ class DockerEnvironment(BaseEnvironment):
             *([] if self._image_uses_s6_init or self._snap_compat else ["--init"]),
             "--name", name,
             *label_args,
-            "-w", workdir,
+            "-w", _windows_to_posix_path(workdir),
             *self._all_run_args,
             self._image,
             "sleep", "infinity"]
