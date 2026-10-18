@@ -1031,7 +1031,7 @@ class LocalEnvironment(BaseEnvironment):
     @staticmethod
     def _quote_cwd_for_cd(cwd: str) -> str:
         """Use native paths for Python, but Git Bash-friendly paths for cd."""
-        return BaseEnvironment._quote_cwd_for_cd(_windows_to_msys_path(cwd))
+        return _quote_bash_path(cwd)
 
     def _quote_shell_path(self, path: str) -> str:
         """Rewrite native/mixed Windows paths before quoting for Git Bash."""
