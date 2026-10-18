@@ -172,6 +172,10 @@ _FAILURE_HINT_RULES = (
     (r"TypeError: string indices must be integers|AttributeError: 'str' object has no attribute 'get'",
      lambda m, _: "Tool functions in the sandbox return DICTS (already parsed) — "
                   "do not json.loads() them or index them like strings. Example: read_file(path)['content']."),
+    (r"unicode error.*unicodeescape",
+     lambda m, _: "Backslash Windows paths in Python string literals are invalid escapes "
+                  "(\\U/\\u/\\x). Use forward slashes (C:/Users/<user>/...) or a raw string "
+                  "(r'C:\\Users\\<user>\\...')."),
 )
 
 

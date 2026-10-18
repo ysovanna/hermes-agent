@@ -17,6 +17,14 @@ class TestSandboxFailureHint:
 
 
 
+    def test_windows_path_escape_error_gets_path_hint(self):
+        err = (r"""Traceback (most recent call last):
+  File "<cell>", line 1
+SyntaxError: (unicode error) 'unicodeescape' codec can't decode bytes in position 2-8: truncated \UXXXXXXXX escape""")
+        h = _sandbox_failure_hint(err, enabled_tools={"terminal"})
+        assert "forward slashes" in h
+        assert "raw string" in h
+
     def test_unknown_failure_no_hint(self):
         assert _sandbox_failure_hint("ZeroDivisionError: division by zero") is None
 
